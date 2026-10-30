@@ -1,0 +1,10 @@
+{
+  "description": "Connects B2B clients with authentic gold sourcing from the DRC, featuring a premium responsive design, dual-language support, and a comprehensive product gallery.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
