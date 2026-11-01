@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // An admin is an authenticated user with a document in /admins.
+    // Only the Admin SDK (seed script / Firebase console) can create these.
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isNonEmptyString(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Public catalogue. Anyone can read; only admins can change it.
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /gallery/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Contact details used by the public site.
+    match /settings/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Public contact form: anyone can submit a valid inquiry, only admins can read it.
+    match /inquiries/{inquiryId} {
+      allow create: if request.resource.data.keys().hasAll([
+          'fullName', 'businessEmail', 'company', 'inquiryType', 'message', 'consent', 'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.fullName, 120)
+        && isNonEmptyString(request.resource.data.businessEmail, 200)
+        && request.resource.data.businessEmail.matches('.+@.+\\..+')
+        && request.resource.data.company is string
+        && request.resource.data.company.size() <= 160
+        && request.resource.data.inquiryType in ['general', 'quote', 'compliance']
+        && isNonEmptyString(request.resource.data.message, 4000)
+        && request.resource.data.consent == true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // EN → FR cache. Admins only.
+    match /translations/{entryId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Deny everything not explicitly matched.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,15 @@
 {
-  "description": "Connects B2B clients with authentic gold sourcing from the DRC, featuring a premium responsive design, dual-language support, and a comprehensive product gallery.",
+  "title": "COOMIAC PROJET — Gold from Walikale, DR Congo",
+  "description": "COOMIAC PROJET is a gold cooperative based in Walikale, North Kivu, DRC, connecting qualified international buyers with responsibly sourced, documented gold.",
+  "language": "en",
   "robots": {
-    "index": false
+    "index": true
+  },
+  "icons": {
+    "icon": "/favicon.png"
+  },
+  "customScripts": {
+    "headEnd": "<meta name=\"theme-color\" content=\"#11110f\" />\n<meta property=\"og:type\" content=\"website\" />\n<meta property=\"og:image\" content=\"https://images.unsplash.com/photo-1762463176312-1757d5125c85?crop=entropy&amp;cs=tinysrgb&amp;fit=crop&amp;fm=jpg&amp;q=80&amp;w=1200&amp;h=630&amp;auto=format\" />\n<meta name=\"twitter:card\" content=\"summary_large_image\" />\n<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\" />\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin />\n<link rel=\"preconnect\" href=\"https://images.unsplash.com\" />\n<script>try{if(localStorage.getItem(\"theme\")!==\"light\"){document.documentElement.dataset.theme=\"dark\";document.documentElement.style.colorScheme=\"dark\"}}catch(e){}</script>"
   },
   "accessibility": {
     "addBypassLinks": false,

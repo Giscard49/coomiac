@@ -1,18 +1,23 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 
-import siteConfiguration from './.figma/make/site.json'
+import siteConfiguration from './.figma/make/site.json' with { type: 'json' }
+import { translateHandler } from './api/translate.ts'
 
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  // Load server-only keys (OPENAI_API_KEY, FIREBASE_PROJECT_ID) for the local API route.
+  const env = loadEnv(mode, process.cwd(), '')
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    // Keep .env at the repository root even when Vite is launched from elsewhere.
+    envDir: '.',
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
@@ -20,6 +25,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
 react(),
       tailwindcss(),
+      devTranslationApi(env),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -27,7 +33,7 @@ react(),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
       },
     },
     server: {
@@ -46,6 +52,32 @@ react(),
     },
   }
 })
+
+/** Serves /api/translate during `vite dev`, mirroring the Vercel serverless route. */
+function devTranslationApi(env: Record<string, string>): Plugin {
+  return {
+    name: 'coomiac-dev-translation-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if ((req.url || '').split('?')[0] !== '/api/translate') return next()
+
+        for (const key of ['OPENAI_API_KEY', 'OPENAI_TRANSLATION_MODEL', 'FIREBASE_PROJECT_ID']) {
+          if (!process.env[key] && env[key]) process.env[key] = env[key]
+        }
+
+        void translateHandler(req, res).catch((error) => {
+          console.error('[dev translate]', error)
+          if (!res.headersSent) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          }
+          if (!res.writableEnded) res.end(JSON.stringify({ error: 'Translation middleware error.' }))
+        })
+      })
+    },
+  }
+}
 
 type FigmaSiteConfiguration = {
   title?: string
@@ -86,7 +118,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
     return html.replace(`<!-- ${slotName} -->`, content)
   }
 
-  const title = config.title ?? "Figma Make App"
+  const title = config.title ?? "COOMIAC"
   const description = config.description ?? ''
   // Imported HTML keeps its own favicon; new Makes default to the Make product icon.
   const favicon = config.icons?.icon ?? '/favicon.svg'
