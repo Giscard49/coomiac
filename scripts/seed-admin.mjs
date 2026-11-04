@@ -90,9 +90,9 @@ try {
 
   await firestore.doc("settings/site").set(
     {
-      email: process.env.SITE_CONTACT_EMAIL?.trim() || email,
-      phone: process.env.SITE_CONTACT_PHONE?.trim() || "+250 796 145 610",
-      whatsapp: process.env.SITE_CONTACT_WHATSAPP?.trim() || "250796145610",
+      email: process.env.SITE_CONTACT_EMAIL?.trim() || "coomiaec@gmail.com",
+      phone: process.env.SITE_CONTACT_PHONE?.trim() || "+243 813 236 392",
+      whatsapp: process.env.SITE_CONTACT_WHATSAPP?.trim() || "243813236392",
       address_en: process.env.SITE_CONTACT_ADDRESS_EN?.trim() || "Walikale, North Kivu, DR Congo",
       address_fr: process.env.SITE_CONTACT_ADDRESS_FR?.trim() || "Walikale, Nord-Kivu, RD Congo",
       updatedAt: FieldValue.serverTimestamp(),

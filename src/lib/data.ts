@@ -3,9 +3,9 @@ import {
   collection,
   deleteDoc,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
+  increment,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -16,8 +16,10 @@ import { getDownloadURL, getStorage, ref, uploadBytes, type FirebaseStorage } fr
 import { alternateStorageBucket, db, firebaseApp, requireDb, requireStorage } from "./firebase";
 import {
   defaultSettings,
+  normalizeSettings,
   type GalleryItem,
   type Inquiry,
+  type InquiryReply,
   type InquiryType,
   type Product,
   type SiteSettings,
@@ -54,7 +56,8 @@ const WRITE_TIMEOUT = "Firestore did not respond. The change may not have been s
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
 export type GalleryInput = Omit<GalleryItem, "id" | "createdAt">;
-export type InquiryInput = Omit<Inquiry, "id" | "createdAt">;
+export type InquiryInput = Omit<Inquiry, "id" | "createdAt" | "status" | "replyCount" | "lastReplyAt">;
+export type ReplyInput = Omit<InquiryReply, "id" | "sentAt">;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -67,6 +70,8 @@ function toProduct(id: string, data: DocumentData): Product {
     title_fr: text(data.title_fr),
     description_en: text(data.description_en),
     description_fr: text(data.description_fr),
+    spec_en: text(data.spec_en),
+    spec_fr: text(data.spec_fr),
     imageUrl: text(data.imageUrl),
     category: text(data.category),
     createdAt: data.createdAt ?? null,
@@ -96,7 +101,22 @@ function toInquiry(id: string, data: DocumentData): Inquiry {
       : "general",
     message: text(data.message),
     consent: data.consent === true,
+    status: data.status === "replied" || (typeof data.replyCount === "number" && data.replyCount > 0) ? "replied" : "new",
+    replyCount: typeof data.replyCount === "number" ? data.replyCount : 0,
+    lastReplyAt: data.lastReplyAt ?? null,
     createdAt: data.createdAt ?? null,
+  };
+}
+
+function toInquiryReply(id: string, data: DocumentData): InquiryReply {
+  return {
+    id,
+    subject: text(data.subject),
+    message: text(data.message),
+    to: text(data.to),
+    from: text(data.from),
+    sentBy: text(data.sentBy),
+    sentAt: data.sentAt ?? null,
   };
 }
 
@@ -226,6 +246,8 @@ export async function createInquiry(input: InquiryInput): Promise<void> {
   await withTimeout(
     addDoc(collection(requireDb(), "inquiries"), {
       ...input,
+      status: "new",
+      replyCount: 0,
       createdAt: serverTimestamp(),
     }),
     "The inquiry could not be saved because Firestore did not respond. Please email us instead.",
@@ -240,13 +262,45 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
     .sort((a, b) => millis(b.createdAt) - millis(a.createdAt));
 }
 
+export async function fetchInquiryReplies(inquiryId: string): Promise<InquiryReply[]> {
+  if (!db) return [];
+  const snapshot = await withTimeout(getDocs(collection(db, "inquiries", inquiryId, "replies")), READ_TIMEOUT);
+  return snapshot.docs
+    .map((item) => toInquiryReply(item.id, item.data()))
+    .sort((a, b) => millis(a.sentAt) - millis(b.sentAt));
+}
+
+/** Records a reply after the server confirms the email was sent. */
+export async function recordInquiryReply(inquiryId: string, input: ReplyInput): Promise<void> {
+  const database = requireDb();
+  await withTimeout(
+    addDoc(collection(database, "inquiries", inquiryId, "replies"), {
+      ...input,
+      sentAt: serverTimestamp(),
+    }),
+    WRITE_TIMEOUT,
+  );
+  await withTimeout(
+    updateDoc(doc(database, "inquiries", inquiryId), {
+      status: "replied",
+      replyCount: increment(1),
+      lastReplyAt: serverTimestamp(),
+    }),
+    WRITE_TIMEOUT,
+  );
+}
+
+export async function setInquiryStatus(inquiryId: string, status: "new" | "replied"): Promise<void> {
+  await withTimeout(updateDoc(doc(requireDb(), "inquiries", inquiryId), { status }), WRITE_TIMEOUT);
+}
+
 /* --------------------------------- settings -------------------------------- */
 
 export async function fetchSettings(): Promise<SiteSettings> {
   if (!db) return defaultSettings;
   const snapshot = await withTimeout(getDoc(doc(db, "settings", "site")), READ_TIMEOUT);
   return snapshot.exists()
-    ? { ...defaultSettings, ...(snapshot.data() as Partial<SiteSettings>) }
+    ? normalizeSettings({ ...defaultSettings, ...(snapshot.data() as Partial<SiteSettings>) })
     : defaultSettings;
 }
 
@@ -256,12 +310,4 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
     setDoc(doc(requireDb(), "settings", "site"), { ...values, updatedAt: serverTimestamp() }, { merge: true }),
     WRITE_TIMEOUT,
   );
-}
-
-/* --------------------------------- counting -------------------------------- */
-
-export async function countTranslationCache(): Promise<number> {
-  if (!db) return 0;
-  const snapshot = await withTimeout(getCountFromServer(collection(db, "translations")), READ_TIMEOUT);
-  return snapshot.data().count;
 }

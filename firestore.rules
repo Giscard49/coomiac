@@ -48,8 +48,24 @@ service cloud.firestore {
         && request.resource.data.company.size() <= 160
         && request.resource.data.inquiryType in ['general', 'quote', 'compliance']
         && isNonEmptyString(request.resource.data.message, 4000)
-        && request.resource.data.consent == true;
+        && request.resource.data.consent == true
+        && (!request.resource.data.keys().hasAny(['status', 'replyCount', 'lastReplyAt'])
+          || (request.resource.data.status == 'new'
+            && request.resource.data.replyCount == 0
+            && !request.resource.data.keys().hasAny(['lastReplyAt'])));
       allow read, update, delete: if isAdmin();
+
+      // Reply thread written by the admin console after /api/reply sends the email.
+      match /replies/{replyId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasAll(['subject', 'message', 'to', 'from', 'sentAt'])
+          && isNonEmptyString(request.resource.data.subject, 300)
+          && isNonEmptyString(request.resource.data.message, 20000)
+          && isNonEmptyString(request.resource.data.to, 200)
+          && isNonEmptyString(request.resource.data.from, 200);
+        allow update, delete: if false;
+      }
     }
 
     // EN → FR cache. Admins only.

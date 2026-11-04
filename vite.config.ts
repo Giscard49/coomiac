@@ -2,9 +2,11 @@ import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import siteConfiguration from './.figma/make/site.json' with { type: 'json' }
 import { translateHandler } from './api/translate.ts'
+import { replyHandler } from './api/reply.ts'
 
 
 // Vite config — https://vitejs.dev/config/
@@ -25,7 +27,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
 react(),
       tailwindcss(),
-      devTranslationApi(env),
+      devApiRoutes(env),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -53,26 +55,49 @@ react(),
   }
 })
 
-/** Serves /api/translate during `vite dev`, mirroring the Vercel serverless route. */
-function devTranslationApi(env: Record<string, string>): Plugin {
+type ApiHandler = (req: IncomingMessage, res: ServerResponse) => Promise<void>
+
+/** Serves /api/* during `vite dev`, mirroring the Vercel serverless routes. */
+function devApiRoutes(env: Record<string, string>): Plugin {
+  const routes: Record<string, { handler: ApiHandler; envKeys: string[] }> = {
+    '/api/translate': {
+      handler: translateHandler,
+      envKeys: ['OPENAI_API_KEY', 'OPENAI_TRANSLATION_MODEL', 'FIREBASE_PROJECT_ID'],
+    },
+    '/api/reply': {
+      handler: replyHandler,
+      envKeys: [
+        'FIREBASE_PROJECT_ID',
+        'SMTP_HOST',
+        'SMTP_PORT',
+        'SMTP_USER',
+        'SMTP_PASS',
+        'REPLY_FROM_EMAIL',
+        'REPLY_FROM_NAME',
+        'RESEND_API_KEY',
+      ],
+    },
+  }
+
   return {
-    name: 'coomiac-dev-translation-api',
+    name: 'coomiac-dev-api-routes',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if ((req.url || '').split('?')[0] !== '/api/translate') return next()
+        const route = routes[(req.url || '').split('?')[0]]
+        if (!route) return next()
 
-        for (const key of ['OPENAI_API_KEY', 'OPENAI_TRANSLATION_MODEL', 'FIREBASE_PROJECT_ID']) {
+        for (const key of route.envKeys) {
           if (!process.env[key] && env[key]) process.env[key] = env[key]
         }
 
-        void translateHandler(req, res).catch((error) => {
-          console.error('[dev translate]', error)
+        void route.handler(req, res).catch((error) => {
+          console.error('[dev api]', error)
           if (!res.headersSent) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
           }
-          if (!res.writableEnded) res.end(JSON.stringify({ error: 'Translation middleware error.' }))
+          if (!res.writableEnded) res.end(JSON.stringify({ error: 'API middleware error.' }))
         })
       })
     },

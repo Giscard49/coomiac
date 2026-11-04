@@ -3,14 +3,10 @@ import { fetchGallery, fetchInquiries, fetchProducts, fetchSettings, saveSetting
 import { defaultSettings, type Inquiry, type SiteSettings } from "../lib/models";
 import { AppButton } from "../components/ui";
 import { errorMessage, formatDate } from "./utils";
+import { useAdminI18n } from "./i18n";
 
-const inquiryLabels: Record<string, string> = {
-  general: "General partnership",
-  quote: "Product quote",
-  compliance: "Compliance & documents",
-};
-
-export default function OverviewAdmin() {
+export default function OverviewAdmin({ navigate }: { navigate: (to: string) => void }) {
+  const { lang, t } = useAdminI18n();
   const [counts, setCounts] = useState<{ products: number; gallery: number; inquiries: number } | null>(null);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
@@ -32,11 +28,11 @@ export default function OverviewAdmin() {
       setSettings(siteSettings);
       setNote(null);
     } catch (error) {
-      setNote({ kind: "error", text: errorMessage(error) });
+      setNote({ kind: "error", text: errorMessage(error, lang) });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     void load();
@@ -47,9 +43,9 @@ export default function OverviewAdmin() {
     setNote(null);
     try {
       await saveSettings(settings);
-      setNote({ kind: "ok", text: "Contact details updated. The public website now uses them." });
+      setNote({ kind: "ok", text: t.overview.contactUpdated });
     } catch (error) {
-      setNote({ kind: "error", text: errorMessage(error) });
+      setNote({ kind: "error", text: errorMessage(error, lang) });
     } finally {
       setSaving(false);
     }
@@ -60,9 +56,9 @@ export default function OverviewAdmin() {
   };
 
   const cards = [
-    { label: "Products", value: counts?.products ?? 0, hint: "Published on the products page" },
-    { label: "Gallery photos", value: counts?.gallery ?? 0, hint: "Visible in the public gallery" },
-    { label: "Inquiries", value: counts?.inquiries ?? 0, hint: "Received through the contact form" },
+    { label: t.overview.stats.products, value: counts?.products ?? 0, hint: t.overview.stats.productsHint },
+    { label: t.overview.stats.gallery, value: counts?.gallery ?? 0, hint: t.overview.stats.galleryHint },
+    { label: t.overview.stats.messages, value: counts?.inquiries ?? 0, hint: t.overview.stats.messagesHint },
   ];
 
   return (
@@ -81,72 +77,100 @@ export default function OverviewAdmin() {
 
       {note?.kind === "error" && (
         <section className="admin-panel admin-help setup-checklist">
-          <h3>Firebase setup checklist</h3>
+          <h3>{t.overview.checklistTitle}</h3>
           <ul>
-            <li><b>Firestore Database</b> is created for the <code>coomiac</code> project.</li>
-            <li>The latest <code>firestore.rules</code> is published.</li>
-            <li><b>Storage</b> is started and <code>storage.rules</code> is published.</li>
-            <li>Your signed-in account has an <code>admins/&#123;uid&#125;</code> document.</li>
+            <li>
+              <b>{t.access.firestoreDatabase}</b> {t.overview.checklistDbPrefix}{" "}
+              <code>coomiac</code>.
+            </li>
+            <li>
+              {t.overview.checklistRulesPrefix} <code>firestore.rules</code>{" "}
+              {t.overview.checklistRulesSuffix}
+            </li>
+            <li>
+              <b>{t.overview.checklistStoragePrefix}</b>{" "}
+              {t.overview.checklistStorageSuffix}{" "}
+              <code>{t.overview.checklistStorageRules}</code>{" "}
+              {t.overview.checklistStorageRulesSuffix}
+            </li>
+            <li>
+              {t.overview.checklistAdminPrefix} <code>admins/&#123;uid&#125;</code>
+              {t.overview.checklistAdminSuffix}
+            </li>
           </ul>
-          <p>After changing anything in Firebase Console, refresh this page or sign out and back in.</p>
+          <p>{t.overview.checklistAfter}</p>
         </section>
       )}
 
       <section className="admin-panel">
         <div className="panel-head">
           <div>
-            <h2>Contact details</h2>
-            <p>These values power the contact page, the footer and the WhatsApp button.</p>
+            <h2>{t.overview.contact.title}</h2>
+            <p>{t.overview.contact.description}</p>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
+            {loading ? t.common.refreshing : t.common.refresh}
           </button>
         </div>
         <div className="form">
           <div className="form-grid">
-            <label>Email
-              <input type="email" value={settings.email} onChange={(event) => update("email", event.target.value)} placeholder="contact@coomiac-projet.cd" />
+            <label>{t.overview.contact.email}
+              <input type="email" value={settings.email} onChange={(event) => update("email", event.target.value)} placeholder="coomiaec@gmail.com" />
             </label>
-            <label>Phone
-              <input value={settings.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+250 796 145 610" />
+            <label>{t.overview.contact.phone}
+              <input value={settings.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+243 813 236 392" />
             </label>
-            <label>WhatsApp number
-              <input value={settings.whatsapp} onChange={(event) => update("whatsapp", event.target.value)} placeholder="250796145610" />
-              <small className="field-hint">Digits only, including the country code (no + or spaces).</small>
+            <label>{t.overview.contact.whatsapp}
+              <input value={settings.whatsapp} onChange={(event) => update("whatsapp", event.target.value)} placeholder="243813236392" />
+              <small className="field-hint">{t.overview.contact.whatsappHint}</small>
             </label>
-            <label>Address (EN)
+            <label>{t.overview.contact.addressEn}
               <input value={settings.address_en} onChange={(event) => update("address_en", event.target.value)} placeholder="Walikale, North Kivu, DR Congo" />
             </label>
-            <label>Address (FR)
+            <label>{t.overview.contact.addressFr}
               <input value={settings.address_fr} onChange={(event) => update("address_fr", event.target.value)} placeholder="Walikale, Nord-Kivu, RD Congo" />
             </label>
           </div>
-          <AppButton onClick={() => void save()} disabled={saving}>{saving ? "Saving…" : "Save contact details"}</AppButton>
+          <AppButton onClick={() => void save()} disabled={saving}>{saving ? t.common.saving : t.overview.contact.save}</AppButton>
         </div>
       </section>
 
       <section className="admin-panel">
         <div className="panel-head">
           <div>
-            <h2>Recent inquiries</h2>
-            <p>The latest messages submitted through the public contact form.</p>
+            <h2>{t.overview.latest.title}</h2>
+            <p>{t.overview.latest.description}</p>
           </div>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate("/admin/messages")}>
+            {t.common.openMessages}
+          </button>
         </div>
         {loading && !counts ? (
-          <p className="muted">Loading inquiries…</p>
+          <p className="muted">{t.overview.latest.loading}</p>
         ) : inquiries.length === 0 ? (
-          <p className="muted">No inquiries yet. New messages will appear here.</p>
+          <p className="muted">{t.overview.latest.empty}</p>
         ) : (
           <div className="inquiry-list">
-            {inquiries.slice(0, 8).map((inquiry) => (
+            {inquiries.slice(0, 6).map((inquiry) => (
               <article className="inquiry-item" key={inquiry.id}>
                 <div className="inquiry-head">
                   <b>{inquiry.fullName}</b>
-                  <span className="inquiry-type">{inquiryLabels[inquiry.inquiryType] ?? inquiry.inquiryType}</span>
-                  <small>{formatDate(inquiry.createdAt)}</small>
+                  <span className="inquiry-type">
+                    {t.overview.inquiryTypes[inquiry.inquiryType] ?? inquiry.inquiryType}
+                  </span>
+                  <span className={`status-badge ${inquiry.status === "replied" ? "ok" : ""}`}>
+                    {inquiry.status === "replied" ? t.common.statusReplied : t.common.statusNew}
+                  </span>
+                  <small>{formatDate(inquiry.createdAt, lang)}</small>
                 </div>
                 <small>{inquiry.company} · <a href={`mailto:${inquiry.businessEmail}`}>{inquiry.businessEmail}</a></small>
                 <p>{inquiry.message}</p>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => navigate(`/admin/messages?inquiry=${inquiry.id}`)}
+                >
+                  {inquiry.status === "replied" ? t.common.viewConversation : t.common.reply}
+                </button>
               </article>
             ))}
           </div>

@@ -9,42 +9,43 @@ import AdminLogin from "./AdminLogin";
 import OverviewAdmin from "./OverviewAdmin";
 import ProductsAdmin from "./ProductsAdmin";
 import GalleryAdmin from "./GalleryAdmin";
-import TranslationAdmin from "./TranslationAdmin";
+import InboxAdmin from "./InboxAdmin";
+import { AdminLangProvider, AdminLangToggle, useAdminI18n } from "./i18n";
 
-type AdminPage = "overview" | "products" | "gallery" | "translation";
+type AdminPage = "overview" | "products" | "gallery" | "inbox";
 
-const navigation: { page: AdminPage; path: string; label: string }[] = [
-  { page: "overview", path: "/admin", label: "Overview" },
-  { page: "products", path: "/admin/products", label: "Products" },
-  { page: "gallery", path: "/admin/photo-gallery", label: "Photo gallery" },
-  { page: "translation", path: "/admin/translations", label: "Translation" },
+const navigation: { page: AdminPage; path: string; label: "overview" | "messages" | "products" | "gallery" }[] = [
+  { page: "overview", path: "/admin", label: "overview" },
+  { page: "inbox", path: "/admin/messages", label: "messages" },
+  { page: "products", path: "/admin/products", label: "products" },
+  { page: "gallery", path: "/admin/photo-gallery", label: "gallery" },
 ];
-
-const headings: Record<AdminPage, { title: string; subtitle: string }> = {
-  overview: { title: "Overview", subtitle: "Your catalogue, gallery and incoming inquiries at a glance." },
-  products: { title: "Products", subtitle: "Publish and translate the gold products shown on the public site." },
-  gallery: { title: "Photo gallery", subtitle: "Manage the photographs displayed in the public gallery." },
-  translation: { title: "Translation", subtitle: "English to French service status and automatic translation rules." },
-};
 
 function routeFor(path: string): AdminPage {
   if (path === "/admin/products") return "products";
   if (path === "/admin/photo-gallery") return "gallery";
-  if (path === "/admin/translations") return "translation";
+  // Older bookmarks pointed at the former translation screen.
+  if (path === "/admin/messages" || path === "/admin/translations") return "inbox";
   return "overview";
 }
 
-export default function AdminApp({
-  path,
-  navigate,
-  dark,
-  setDark,
-}: {
+type AdminAppProps = {
   path: string;
   navigate: (to: string, options?: { replace?: boolean }) => void;
   dark: boolean;
   setDark: (value: boolean) => void;
-}) {
+};
+
+export default function AdminApp(props: AdminAppProps) {
+  return (
+    <AdminLangProvider>
+      <AdminAppContent {...props} />
+    </AdminLangProvider>
+  );
+}
+
+function AdminAppContent({ path, navigate, dark, setDark }: AdminAppProps) {
+  const { lang, t } = useAdminI18n();
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [authError, setAuthError] = useState("");
   const [access, setAccess] = useState<"checking" | "granted" | "denied" | "error">("checking");
@@ -62,11 +63,11 @@ export default function AdminApp({
       auth,
       (next) => setUser(next),
       (error) => {
-        setAuthError(authErrorMessage(error));
+        setAuthError(authErrorMessage(error, lang));
         setUser(null);
       },
     );
-  }, []);
+  }, [lang]);
 
   // Firestore is the source of truth for admin access. A Firebase account alone
   // is not enough: the seed script adds /admins/{uid}.
@@ -87,17 +88,20 @@ export default function AdminApp({
       .catch((error) => {
         if (!alive) return;
         setAccess("error");
-        setAccessError(errorMessage(error));
+        setAccessError(errorMessage(error, lang));
         setAccessErrorDetail(errorDetail(error));
       });
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, lang]);
 
   useEffect(() => {
-    document.title = user ? `${headings[page].title} · COOMIAC Admin` : "Admin sign in · COOMIAC PROJET";
-  }, [page, user]);
+    document.title = user
+      ? `${t.headings[page].title} · ${t.shell.adminSuffix}`
+      : `${t.login.signIn} · COOMIAC PROJET`;
+    document.documentElement.lang = lang;
+  }, [page, user, lang, t]);
 
   useEffect(() => {
     if (user && isLoginPath) navigate("/admin", { replace: true });
@@ -122,7 +126,7 @@ export default function AdminApp({
     return (
       <div className="admin-loading">
         <span className="eyebrow">COOMIAC PROJET</span>
-        <p>Loading workspace…</p>
+        <p>{t.shell.loadingWorkspace}</p>
       </div>
     );
   }
@@ -132,7 +136,7 @@ export default function AdminApp({
       return (
         <div className="admin-loading">
           <span className="eyebrow">COOMIAC PROJET</span>
-          <p>Redirecting to sign in…</p>
+          <p>{t.shell.redirecting}</p>
         </div>
       );
     }
@@ -143,7 +147,7 @@ export default function AdminApp({
     return (
       <div className="admin-loading">
         <span className="eyebrow">COOMIAC PROJET</span>
-        <p>Checking access…</p>
+        <p>{t.shell.checkingAccess}</p>
       </div>
     );
   }
@@ -152,27 +156,35 @@ export default function AdminApp({
     return (
       <div className="admin-login">
         <div className="admin-panel admin-setup">
-          <span className="eyebrow">Restricted area</span>
-          <h1>Account not authorized</h1>
+          <span className="eyebrow">{t.access.restricted}</span>
+          <h1>{t.access.notAuthorized}</h1>
           <p>
-            <b>{user.email}</b> is signed in, but there is no administrator document for this account.
+            <b>{user.email}</b> {t.access.notAuthorizedSuffix}
           </p>
           <div className="admin-help">
-            <p><b>MANUAL ACTION REQUIRED</b></p>
+            <p><b>{t.access.manualAction}</b></p>
             <ol>
-              <li>Open Firebase Console → Firestore Database.</li>
-              <li>Create or open the <code>admins</code> collection.</li>
-              <li>Add a document whose ID is exactly <code>{user.uid}</code>.</li>
-              <li>Add an <code>email</code> field containing <code>{user.email}</code>.</li>
+              <li>{t.access.stepOpen}</li>
+              <li>
+                {t.access.stepCreatePrefix} <code>{t.access.stepCreateCollection}</code>
+                {t.access.stepCreateSuffix}
+              </li>
+              <li>
+                {t.access.stepIdPrefix} <code>{user.uid}</code>.
+              </li>
+              <li>
+                {t.access.stepEmailPrefix} <code>{t.access.stepEmailField}</code>{" "}
+                {t.access.stepEmailSuffix} <code>{user.email}</code>.
+              </li>
             </ol>
             <p>
-              Or run <code>npm run seed:admin</code> with a service account. The published{" "}
-              <code>firestore.rules</code> then allow this account into the console.
+              {t.access.seedPrefix} <code>npm run seed:admin</code> {t.access.seedMiddle}{" "}
+              <code>firestore.rules</code> {t.access.seedSuffix}
             </p>
           </div>
           <div className="admin-actions">
-            <AppButton kind="outline" onClick={() => void signOutAdmin()}>Sign out</AppButton>
-            <AppButton kind="ghost" onClick={() => navigate("/")}>Back to website</AppButton>
+            <AppButton kind="outline" onClick={() => void signOutAdmin()}>{t.common.signOut}</AppButton>
+            <AppButton kind="ghost" onClick={() => navigate("/")}>{t.common.backWebsite}</AppButton>
           </div>
         </div>
       </div>
@@ -183,24 +195,27 @@ export default function AdminApp({
     return (
       <div className="admin-login">
         <div className="admin-panel admin-setup">
-          <span className="eyebrow">Connection problem</span>
-          <h1>Could not verify access</h1>
-          <p>{errorMessage(accessError)}</p>
+          <span className="eyebrow">{t.access.connectionProblem}</span>
+          <h1>{t.access.cannotVerify}</h1>
+          <p>{accessError}</p>
           <div className="admin-help">
-            <p>Check these Firebase Console items, then retry:</p>
+            <p>{t.access.checkItems}</p>
             <ul>
-              <li><b>Firestore Database</b> is created for the project.</li>
-              <li><code>firestore.rules</code> is published.</li>
-              <li>Your account has an <code>admins/{user.uid}</code> document.</li>
+              <li><b>{t.access.firestoreDatabase}</b> {t.access.firestoreDbSuffix}</li>
+              <li><code>{t.access.rules}</code> {t.access.rulesSuffix}</li>
+              <li>
+                {t.access.accountDocPrefix} <code>admins/{user.uid}</code>
+                {t.access.accountDocSuffix}
+              </li>
             </ul>
           </div>
           <details className="error-details">
-            <summary>Technical details</summary>
+            <summary>{t.common.technicalDetails}</summary>
             <code>{accessErrorDetail}</code>
           </details>
           <div className="admin-actions">
-            <AppButton onClick={() => window.location.reload()}>Retry</AppButton>
-            <AppButton kind="outline" onClick={() => void signOutAdmin()}>Sign out</AppButton>
+            <AppButton onClick={() => window.location.reload()}>{t.common.retry}</AppButton>
+            <AppButton kind="outline" onClick={() => void signOutAdmin()}>{t.common.signOut}</AppButton>
           </div>
         </div>
       </div>
@@ -210,48 +225,49 @@ export default function AdminApp({
   return (
     <div className="admin-shell">
       <aside>
-        <button className="brand" onClick={() => navigate("/")} aria-label="Back to the public website">
+        <button className="brand" onClick={() => navigate("/")} aria-label={t.shell.backPublic}>
           <span className="brand-mark"><span>CP</span></span>
           <span><b>COOMIAC</b><small>PROJET · ADMIN</small></span>
         </button>
 
-        <nav aria-label="Admin sections">
+        <nav aria-label={t.nav.label}>
           {navigation.map((item) => (
             <button
               key={item.page}
               className={page === item.page ? "active" : ""}
               onClick={() => navigate(item.path)}
             >
-              {item.label}
+              {t.nav[item.label]}
             </button>
           ))}
         </nav>
 
         <div className="admin-account">
-          <small>{user.email ?? "Signed in"}</small>
-          <button className="logout" onClick={() => void signOutAdmin()}>Sign out</button>
+          <small>{user.email ?? t.common.signedIn}</small>
+          <button className="logout" onClick={() => void signOutAdmin()}>{t.common.signOut}</button>
         </div>
       </aside>
 
       <main>
         <header>
           <div>
-            <span className="eyebrow">Workspace</span>
-            <h1>{headings[page].title}</h1>
-            <p className="muted">{headings[page].subtitle}</p>
+            <span className="eyebrow">{t.shell.workspace}</span>
+            <h1>{t.headings[page].title}</h1>
+            <p className="muted">{t.headings[page].subtitle}</p>
           </div>
           <div className="admin-header-actions">
-            <button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="Toggle dark mode">
-              {dark ? "Light" : "Dark"}
+            <AdminLangToggle />
+            <button className="theme-toggle" onClick={() => setDark(!dark)} aria-label={t.shell.toggleDark}>
+              {dark ? t.common.light : t.common.dark}
             </button>
-            <AppButton kind="outline" small onClick={() => navigate("/")}>View site</AppButton>
+            <AppButton kind="outline" small onClick={() => navigate("/")}>{t.common.viewSite}</AppButton>
           </div>
         </header>
 
-        {page === "overview" && <OverviewAdmin />}
+        {page === "overview" && <OverviewAdmin navigate={navigate} />}
+        {page === "inbox" && <InboxAdmin />}
         {page === "products" && <ProductsAdmin />}
         {page === "gallery" && <GalleryAdmin />}
-        {page === "translation" && <TranslationAdmin />}
       </main>
     </div>
   );
