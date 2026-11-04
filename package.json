@@ -1,7 +1,9 @@
 {
-  "name": "figma-make-app",
+  "name": "coomiac",
   "private": true,
   "version": "1.0.0",
+  "description": "COOMIAC PROJET — responsibly sourced coltan, cassiterite, copper, cobalt and gold from Walikale, DR Congo.",
+  "author": "COOMIAC PROJET",
   "type": "module",
   "scripts": {
     "dev": "vite",

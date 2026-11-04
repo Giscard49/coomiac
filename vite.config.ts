@@ -4,20 +4,20 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import siteConfiguration from './.figma/make/site.json' with { type: 'json' }
+import siteConfiguration from './.coomiac/make/site.json' with { type: 'json' }
 import { translateHandler } from './api/translate.ts'
 import { replyHandler } from './api/reply.ts'
 
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
+  // .coomiac/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
   // Load server-only keys (OPENAI_API_KEY, FIREBASE_PROJECT_ID) for the local API route.
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    base: process.env.COOMIAC_PUBLIC_URL ? `${process.env.COOMIAC_PUBLIC_URL}/` : '/',
     // Keep .env at the repository root even when Vite is launched from elsewhere.
     envDir: '.',
     build: {
@@ -28,10 +28,10 @@ export default defineConfig(({ mode }) => {
 react(),
       tailwindcss(),
       devApiRoutes(env),
-      figmaSiteConfiguration(siteConfiguration),
-      figmaErrorOverlayReplay(),
-      figmaReactRefreshBoundaryFallback(),
-      figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
+      coomiacSiteConfiguration(siteConfiguration),
+      coomiacErrorOverlayReplay(),
+      coomiacReactRefreshBoundaryFallback(),
+      coomiacMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
     ],
     resolve: {
       alias: {
@@ -39,17 +39,17 @@ react(),
       },
     },
     server: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      host: process.env.COOMIAC_DEV_SERVER_HOST || '0.0.0.0',
       port: parseInt(process.env.PORT || '3000'),
       strictPort: true,
       watch: {
         ignored: [
-          '**/.figma/**',
+          '**/.coomiac/**',
 ],
       },
     },
     preview: {
-      host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
+      host: process.env.COOMIAC_DEV_SERVER_HOST || '0.0.0.0',
       port: parseInt(process.env.PORT || '3000'),
     },
   }
@@ -104,7 +104,7 @@ function devApiRoutes(env: Record<string, string>): Plugin {
   }
 }
 
-type FigmaSiteConfiguration = {
+type CoomiacSiteConfiguration = {
   title?: string
   description?: string
   language?: string
@@ -131,8 +131,8 @@ type FigmaSiteConfiguration = {
   }
 }
 
-/** Applies /.figma/make/site.json to the generated document shell. */
-function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
+/** Applies /.coomiac/make/site.json to the generated document shell. */
+function coomiacSiteConfiguration(config: CoomiacSiteConfiguration): Plugin {
   function sanitizeHtmlValue(value: string | undefined): string {
     return value?.replace(/[^a-zA-Z0-9_-]/g, '') || ''
   }
@@ -157,7 +157,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
   const robotsTxt = config.robots?.index === false ? 'User-agent: *\nDisallow: /\n' : ''
 
   return {
-    name: 'figma-site-configuration',
+    name: 'coomiac-site-configuration',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (!robotsTxt || req.url?.split('?')[0] !== '/robots.txt') return next()
@@ -179,12 +179,12 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
       order: 'pre',
       handler(html) {
         let result = html
-        result = replaceHtmlCommentSlot(result, 'figma:lang', language)
-        result = replaceHtmlCommentSlot(result, 'figma:title', escapeHtmlText(title))
-        result = replaceHtmlCommentSlot(result, 'figma:head-start', headStart)
-        result = replaceHtmlCommentSlot(result, 'figma:head-end', headEnd)
-        result = replaceHtmlCommentSlot(result, 'figma:body-start', bodyStart)
-        result = replaceHtmlCommentSlot(result, 'figma:body-end', bodyEnd)
+        result = replaceHtmlCommentSlot(result, 'coomiac:lang', language)
+        result = replaceHtmlCommentSlot(result, 'coomiac:title', escapeHtmlText(title))
+        result = replaceHtmlCommentSlot(result, 'coomiac:head-start', headStart)
+        result = replaceHtmlCommentSlot(result, 'coomiac:head-end', headEnd)
+        result = replaceHtmlCommentSlot(result, 'coomiac:body-start', bodyStart)
+        result = replaceHtmlCommentSlot(result, 'coomiac:body-end', bodyEnd)
 
         const tags: HtmlTagDescriptor[] = []
         if (description) {
@@ -238,7 +238,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
             {
               tag: 'style',
               children: `
-  .figma-bypass-link {
+  .coomiac-bypass-link {
     position: fixed;
     top: 8px;
     left: 8px;
@@ -251,7 +251,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
     font: 600 14px/1.2 system-ui, sans-serif;
     text-decoration: none;
   }
-  .figma-bypass-link:focus {
+  .coomiac-bypass-link:focus {
     transform: translateY(0);
   }
 `,
@@ -259,7 +259,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
             },
             {
               tag: 'a',
-              attrs: { class: 'figma-bypass-link', href: '#root' },
+              attrs: { class: 'coomiac-bypass-link', href: '#root' },
               children: 'Skip to content',
               injectTo: 'body-prepend',
             },
@@ -288,9 +288,9 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
  * `update` or `full-reload` so a stale overlay can't survive a
  * fixed build.
  */
-function figmaErrorOverlayReplay(): Plugin {
+function coomiacErrorOverlayReplay(): Plugin {
   return {
-    name: 'figma-error-overlay-replay',
+    name: 'coomiac-error-overlay-replay',
     apply: 'serve',
     configureServer(server) {
       let lastError: object | null = null
@@ -330,14 +330,14 @@ function figmaErrorOverlayReplay(): Plugin {
  * mounted component family. React reports a successful refresh while leaving
  * the old tree mounted until the page is reloaded.
  */
-function figmaReactRefreshBoundaryFallback(): Plugin {
+function coomiacReactRefreshBoundaryFallback(): Plugin {
   type ModuleNode = import('vite').ModuleNode
   const hadRefreshBoundary = new Map<string, boolean>()
   const lostRefreshBoundaries = new Set<string>()
   let sendFullReload: (() => void) | null = null
 
   return {
-    name: 'figma-react-refresh-boundary-fallback',
+    name: 'coomiac-react-refresh-boundary-fallback',
     apply: 'serve',
     enforce: 'post',
     configureServer(server) {
@@ -386,20 +386,20 @@ function figmaReactRefreshBoundaryFallback(): Plugin {
 }
 
 /**
- * Serves a blank render-target page at /.figma/make/kit.html that
- * the Figma preview script drives directly. The page exposes a
+ * Serves a blank render-target page at /.coomiac/make/kit.html that
+ * the Coomiac preview script drives directly. The page exposes a
  * registry of every file matching `storiesGlob` on
- * window.__FIGMA__.stories so the design surface can dynamically
+ * window.__COOMIAC__.stories so the design surface can dynamically
  * import + mount each entry into its own grid view.
  *
  * Dev-only: `apply: 'serve'` gates the plugin to `vite dev`. Prod
  * builds (`vite build`) skip it entirely so the route doesn't leak
  * into shipped bundles.
  */
-function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin {
+function coomiacMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin {
   const storiesGlob = Array.isArray(options.storiesGlob) ? options.storiesGlob : [options.storiesGlob]
-  const ROUTE = '/.figma/make/kit.html'
-  const VIRTUAL_ID = 'virtual:figma-stories'
+  const ROUTE = '/.coomiac/make/kit.html'
+  const VIRTUAL_ID = 'virtual:coomiac-stories'
   const RESOLVED_ID = '\0' + VIRTUAL_ID
   const STORIES_MODULE = `export const stories = import.meta.glob(${JSON.stringify(storiesGlob)})`
   const HTML_BOOTSTRAP = `<!doctype html>
@@ -409,17 +409,17 @@ function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
 <body>
-<div id="figma-make-kit-root"></div>
+<div id="coomiac-make-kit-root"></div>
 <script type="module">
-  import { stories } from 'virtual:figma-stories'
-  window.__FIGMA__ = Object.assign(window.__FIGMA__ ?? {}, { stories })
-  window.dispatchEvent(new CustomEvent('figma.ready'))
+  import { stories } from 'virtual:coomiac-stories'
+  window.__COOMIAC__ = Object.assign(window.__COOMIAC__ ?? {}, { stories })
+  window.dispatchEvent(new CustomEvent('coomiac.ready'))
 </script>
 </body>
 </html>`
 
   return {
-    name: 'figma-make-kit',
+    name: 'coomiac-make-kit',
     apply: 'serve',
     resolveId(id) {
       if (id === VIRTUAL_ID) return RESOLVED_ID

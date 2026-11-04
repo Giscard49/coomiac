@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec figma-analyze routes "$@"
+exec coomiac-analyze routes "$@"

@@ -1,6 +1,6 @@
-# figma-make-app
+# coomiac
 
-React + Vite + Tailwind CSS project running inside.
+React + Vite + Tailwind CSS project for COOMIAC PROJET.
 
 ## Development Server
 
